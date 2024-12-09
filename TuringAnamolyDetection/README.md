@@ -35,8 +35,8 @@ A lightweight, secure IoT gateway leveraging the Turing Pi 2 cluster (1 Jetson N
 ### Quick Start
 1. Clone the repository:
     ```bash
-    git clone https://github.com/<your-username>/IoT-Security-Gateway.git
-    cd IoT-Security-Gateway
+    git clone https://github.com/<your-username>/TuringAnomalyDetection.git
+    cd TuringAnomalyDetection
     ```
 2. Follow the [Setup Guide](docs/setup-guide.md) to initialize the environment.
 
