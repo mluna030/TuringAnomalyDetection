@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  router:
+    build:
+      context: ./src/router/firewall
+      dockerfile: Dockerfile
+    network_mode: "host"         # Required for iptables
+    cap_add:
+      - NET_ADMIN               # Network administration
+      - SYS_MODULE              # Kernel module changes
+    volumes:
+      - ./src/router/firewall/logs:/app/logs
+    container_name: router_node
+
+  detection:
+    build:
+      context: ./src/anomaly-detection
+      dockerfile: Dockerfile
+    environment:
+      - MODEL_PATH=/app/model/anomaly_model.tflite
+    volumes:
+      - ./src/anomaly-detection/model:/app/model
+    container_name: detection_node
+
+  dashboard:
+    build:
+      context: ./dashboard/rocket_dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"             # Expose Rocket-based dashboard
+    container_name: dashboard_node
