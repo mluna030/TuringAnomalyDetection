@@ -1,1 +1,1 @@
-// Training logic for anomaly detection models
+# Training logic for anomaly detection models
