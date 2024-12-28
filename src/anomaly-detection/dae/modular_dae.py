@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras import layers, models
+from tensorflow.python.keras import layers, models
 
 class ModularDAE:
     def __init__(self, input_shape, modality="image", latent_dim=64):

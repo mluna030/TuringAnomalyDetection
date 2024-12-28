@@ -4,10 +4,14 @@ WORKDIR /app
 
 COPY . /app
 
+# Install required Python packages (all in one pip install command)
 RUN pip install --no-cache-dir \
     numpy \
     pandas \
     scikit-learn \
-    matplotlib
+    matplotlib \
+    librosa \
+    scipy \
+    opencv-python-headless
 
 CMD ["bash"]
