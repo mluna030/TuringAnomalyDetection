@@ -1,4 +1,4 @@
-use crate::traits{Filter, Action};
+use crate::traits::{Filter, Action};
 use crate::packets::Packet;
 
 pub struct GeoRules {
@@ -6,7 +6,7 @@ pub struct GeoRules {
 }
 
 impl Filter for GeoRules {
-    pub fn check_packet(
+    fn check_packet(
         &self, 
         packet: &Packet
     ) -> Option<Action> {

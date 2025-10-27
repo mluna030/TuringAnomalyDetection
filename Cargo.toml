@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "dashboard",
+    "dashboard/rocket_dashboard",
+    "dashboard/src/frontend",
+    "src/router/firewall/firewall-core",
+    "src/router/firewall/firewall-daemon",
+    "src/anomaly-detection/inference-rs",
+]
+resolver = "2"

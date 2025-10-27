@@ -7,7 +7,7 @@ pub struct IpRules {
 }
 
 impl Filter for IpRules {
-    pub fn check_packet (
+    fn check_packet (
         &self, 
         packet: &Packet
     ) -> Option<Action> {
