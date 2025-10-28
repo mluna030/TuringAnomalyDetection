@@ -6,6 +6,7 @@ pub mod domain {
     pub mod flow;
     pub mod rule;
     pub mod stats;
+    pub mod rate_limiter;
 }
 
 //Application Layer: Use cases
@@ -26,6 +27,7 @@ pub mod rules {
     pub mod port_rules;
     pub mod geo_rules;
     pub mod time_rules;
+    pub mod rate_limit_rules;
 }
 
 pub struct Firewall {
