@@ -1,1 +1,0 @@
-// Yew frontend entry point

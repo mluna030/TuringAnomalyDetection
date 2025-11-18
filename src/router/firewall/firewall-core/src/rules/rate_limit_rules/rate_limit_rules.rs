@@ -12,13 +12,13 @@ pub struct RateLimitRule {
 
 impl RateLimitRule {
     pub fn new(name: impl Into<String>, config: RateLimitConfig) -> Self {
-        let limiter = Box::new(PerKeyRateLimiter::(
+        let limiter = Box::new(PerKeyRateLimiter::new(
             config.rate,
             config.capacity,
         ));
 
         Self {
-            name: name.Into(),
+            name: name.into(),
             limiter: Arc::new(Mutex::new(limiter)),
             config,
             priority: 70,

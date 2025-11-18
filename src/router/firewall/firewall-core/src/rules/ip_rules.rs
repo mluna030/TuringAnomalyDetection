@@ -1,6 +1,6 @@
 use std::net::IpAddr;
-use crate::traits::{Filter, Action};
-use crate::packet::Packet;
+use crate::domain::packet::Packet;
+use crate::domain::rule::{Filter, Action};
 
 pub struct IpRules {
     pub ip_addr: IpAddr,

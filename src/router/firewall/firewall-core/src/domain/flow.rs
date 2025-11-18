@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
-use std::async::{Arc, Mutex};
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FlowKey {
@@ -32,7 +32,7 @@ impl FlowKey {
         Self {
             src_ip: self.dest_ip,
             dest_ip: self.src_ip,
-            src_port: self.dest_ip,
+            src_port: self.dest_port,  
             dest_port: self.src_port,
             protocol: self.protocol,
         }
@@ -50,6 +50,7 @@ pub struct FlowStats {
 //Statistics for a network flow
 impl FlowStats {
     pub fn new() -> Self {
+        let now = std::time::Instant::now();
         FlowStats {
             packets: 0,
             bytes: 0,

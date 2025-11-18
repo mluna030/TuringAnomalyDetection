@@ -1,5 +1,4 @@
 use std::net::IpAddr;
-use crate::Protocol;
 
 pub struct Packet {
     pub source_ip: IpAddr,
@@ -16,21 +15,31 @@ pub struct PacketHeader {
     pub destination_port: u16,
     pub protocol: Protocol,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Protocol {
     Tcp,
     Udp,
     Icmp,
     Unknown,
 }
-
+impl Protocol {
+    pub fn to_number(&self) -> u8 {
+        match self {
+            Protocol::Tcp => 6,
+            Protocol::Udp => 17,
+            Protocol::Icmp => 1,
+            Protocol::Unknown => 0,
+        }
+    }
+}
 impl Packet {
-    pub fn new(&self, source_ip: IpAddr) -> Self {
+    pub fn new(source_ip: IpAddr) -> Self {
         Packet {
             source_ip,
-            destination_ip: IpAddr::default(),
+            destination_ip: IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
             source_port: 0,
             destination_port: 0,
-            protocol: Protocol,
+            protocol: Protocol::Unknown,
             payload: Vec::new(),
         }
     }

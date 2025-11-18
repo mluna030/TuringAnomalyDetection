@@ -66,6 +66,15 @@ impl RuleManager {
     pub(crate) fn rules_ref(&self) -> Arc<RwLock<Vec<RuleEntry>>> {
         Arc::clone(&self.rules)
     }
+    pub fn set_enabled(&self, id: u64, enabled: bool) -> bool {
+    let mut rules = self.rules.write().unwrap();
+    if let Some(entry) = rules.iter_mut().find(|e| e.id == id) {
+        entry.enabled = enabled;
+        true
+    } else {
+        false
+    }
+}
 }
 
 #[derive(Debug, Clone)]

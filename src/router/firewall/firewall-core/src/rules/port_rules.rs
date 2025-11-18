@@ -98,6 +98,7 @@ impl PortBlocklistRule {
 impl Filter for PortBlocklistRule {
     fn quick_match(&self, header: &PacketHeader) -> bool {
         if !self.matches_protocol(&header.protocol) {
+            return false;
         }
 
         if self.match_source && header.source_port.is_some() {

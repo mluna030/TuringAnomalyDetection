@@ -63,7 +63,7 @@ impl PacketProcessor {
                 return action;
             }
         }
-        self.default_action;
+        self.default_action
     }
     pub(crate) fn rules(&self) -> Arc<RwLock<Vec<RuleEntry>>> {
         Arc::clone(&self.rules)

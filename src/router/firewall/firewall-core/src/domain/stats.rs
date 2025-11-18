@@ -1,4 +1,4 @@
-use domain::rule::Action;
+use crate::domain::rule::Action;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]

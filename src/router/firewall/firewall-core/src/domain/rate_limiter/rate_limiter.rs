@@ -3,7 +3,7 @@ use std::time::Instant;
 use super::token_bucket::{TokenBucket, RateLimiter};
 
 pub struct PerKeyRateLimiter {
-    buckets: Hashmap<String, TokenBucket>,
+    buckets: HashMap<String, TokenBucket>,
     default_rate: f64,
     default_capacity: f64,
 }
