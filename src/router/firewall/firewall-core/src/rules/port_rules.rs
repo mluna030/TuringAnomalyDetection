@@ -118,20 +118,18 @@ impl Filter for PortBlocklistRule {
 
         let mut matched = false;
 
-        if self.match_source {
-            if let Some(port) = packet.source_port {
-                if self.is_port_blocked(port) {
-                    matched = true;
-                }
-            }
+        if self.match_source
+            && let Some(port) = packet.source_port
+            && self.is_port_blocked(port)
+        {
+            matched = true;
         }
 
-        if self.match_destination {
-            if let Some(port) = packet.destination_port {
-                if self.is_port_blocked(port) {
-                    matched = true;
-                }
-            }
+        if self.match_destination
+            && let Some(port) = packet.destination_port
+            && self.is_port_blocked(port)
+        {
+            matched = true;
         }
 
         if matched {
@@ -237,10 +235,10 @@ impl Filter for PortAllowlistRule {
             return None;
         }
 
-        if let Some(port) = packet.destination_port {
-            if !self.is_port_allowed(port) {
-                return Some(Action::Block);
-            }
+        if let Some(port) = packet.destination_port
+            && !self.is_port_allowed(port)
+        {
+            return Some(Action::Block);
         }
 
         None

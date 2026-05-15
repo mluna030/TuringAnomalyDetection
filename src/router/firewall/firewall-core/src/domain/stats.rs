@@ -11,6 +11,12 @@ pub struct FirewallStats {
     start_time: std::time::Instant,
 }
 
+impl Default for FirewallStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FirewallStats {
     pub fn new() -> Self {
         Self {
@@ -32,6 +38,12 @@ pub trait StatsCollector: Send + Sync {
 
 pub struct InMemoryStatsCollector {
     stats: Arc<Mutex<FirewallStats>>,
+}
+
+impl Default for InMemoryStatsCollector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl InMemoryStatsCollector {

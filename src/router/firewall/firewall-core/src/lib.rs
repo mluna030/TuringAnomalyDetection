@@ -1,6 +1,7 @@
+#![allow(clippy::module_inception)]
+
 use std::sync::Arc;
 
-// Domain Layer: Core Business Layer
 pub mod domain {
     pub mod packet;
     pub mod flow;
@@ -9,19 +10,16 @@ pub mod domain {
     pub mod rate_limiter;
 }
 
-//Application Layer: Use cases
-pub mod Application {
+pub mod application {
     pub mod engine;
     pub mod rule_manager;
 }
 
-// Infrastructure Layer: External Integrations
-pub mod  Infrastructure {
+pub mod infrastructure {
     pub mod backends;
     pub mod mqtt;
 }
 
-// Rules: Filter Trait
 pub mod rules {
     pub mod ip_rules;
     pub mod port_rules;
@@ -29,6 +27,14 @@ pub mod rules {
     pub mod time_rules;
     pub mod rate_limit_rules;
 }
+
+pub use application::engine::PacketProcessor;
+pub use application::rule_manager::{RuleInfo, RuleManager};
+pub use domain::flow::{FlowKey, FlowStats, FlowTracker};
+pub use domain::packet::{Packet, PacketHeader, Protocol};
+pub use domain::rule::{Action, Filter, RuleEntry};
+pub use domain::stats::{FirewallStats, InMemoryStatsCollector, StatsCollector};
+pub use infrastructure::mqtt::{FlowReport, MqttPublisher, MqttPublisherConfig};
 
 pub struct Firewall {
     processor: Arc<PacketProcessor>,
@@ -39,42 +45,39 @@ pub struct Firewall {
 
 impl Firewall {
     pub fn new(default_action: Action) -> Self {
-        let flow_tracker = Arc::new(FlowTracker::new());
-        let stats_collector: Arc<dyn StatsCollector> = Arc::new(InMemoryStatsCollector::new());
-        let rule_manager = Arc::new(RuleManager::new());
-
-        let processor = Arc::new(PacketProcessor::new(
-            default_action,
-            Arc::clone(&flow_tracker),
-            Arc::clone(&stats_collector),
-            rule_manager.rules_ref(),
-        ));
-        Self {
-            processor,
-            rule_manager,
-            flow_tracker,
-            stats_collector,
-        }
+        FirewallBuilder::new(default_action).build()
     }
 
     pub fn process_packet(&self, packet: &Packet) -> Action {
         self.processor.process(packet)
     }
+
     pub fn add_rule(&self, filter: Box<dyn Filter>) -> u64 {
         self.rule_manager.add_rule(filter)
     }
+
     pub fn remove_rule(&self, id: u64) -> bool {
         self.rule_manager.remove_rule(id)
     }
+
     pub fn set_rule_enabled(&self, id: u64, enabled: bool) -> bool {
         self.rule_manager.set_enabled(id, enabled)
     }
+
     pub fn list_rules(&self) -> Vec<RuleInfo> {
         self.rule_manager.list_rules()
     }
 
     pub fn get_stats(&self) -> FirewallStats {
         self.stats_collector.get_stats()
+    }
+
+    pub fn stats_collector(&self) -> Arc<dyn StatsCollector> {
+        Arc::clone(&self.stats_collector)
+    }
+
+    pub fn flow_tracker(&self) -> Arc<FlowTracker> {
+        Arc::clone(&self.flow_tracker)
     }
 
     pub fn active_flows(&self) -> usize {
@@ -84,14 +87,11 @@ impl Firewall {
     pub fn cleanup_old_flows(&self, max_age_secs: u64) {
         self.flow_tracker.cleanup_old_flows(max_age_secs)
     }
-
 }
+
 pub struct FirewallBuilder {
     default_action: Action,
     stats_collector: Option<Arc<dyn StatsCollector>>,
-    // Could add more options later:
-    // max_flows: Option<usize>,
-    // flow_timeout: Option<u64>,
 }
 
 impl FirewallBuilder {
@@ -109,11 +109,9 @@ impl FirewallBuilder {
 
     pub fn build(self) -> Firewall {
         let flow_tracker = Arc::new(FlowTracker::new());
-
-        // Use custom or default stats collector
-        let stats_collector = self.stats_collector
+        let stats_collector = self
+            .stats_collector
             .unwrap_or_else(|| Arc::new(InMemoryStatsCollector::new()));
-
         let rule_manager = Arc::new(RuleManager::new());
 
         let processor = Arc::new(PacketProcessor::new(
@@ -131,12 +129,5 @@ impl FirewallBuilder {
         }
     }
 }
-// ReExports
-pub use domain::packet::{Packet, Protocol, PacketHeader};
-pub use domain::rule::{Filter, Action, RuleEntry};
-pub use domain::flow::{FlowKey, FlowStats, FlowTracker};
-pub use domain::stats::{FirewallStats, StatsCollector, InMemoryStatsCollector};
-pub use application::engine::PacketProcessor;
-pub use application::rule_manager::{RuleManager, RuleInfo};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

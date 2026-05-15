@@ -12,7 +12,7 @@ pub struct TokenBucket {
     tokens: f64,
     capacity: f64,
     rate: f64,
-    last_refill: Instant,
+    pub last_refill: Instant,
 }
 
 impl TokenBucket {

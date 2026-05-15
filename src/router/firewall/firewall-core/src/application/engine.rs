@@ -1,7 +1,7 @@
 use crate::domain::{
-    packet::{Packet, PacketHeader},
-    rule::{Action, Filter, RuleEntry},
     flow::{FlowKey, FlowTracker},
+    packet::Packet,
+    rule::{Action, RuleEntry},
     stats::StatsCollector,
 };
 use std::sync::{Arc, RwLock};
@@ -64,8 +64,5 @@ impl PacketProcessor {
             }
         }
         self.default_action
-    }
-    pub(crate) fn rules(&self) -> Arc<RwLock<Vec<RuleEntry>>> {
-        Arc::clone(&self.rules)
     }
 }

@@ -1,9 +1,15 @@
-use crate::domain::rule::{Filter, RuleEntry, Action};
+use crate::domain::rule::{Filter, RuleEntry};
 use std::sync::{Arc, RwLock};
 
 pub struct RuleManager {
     rules: Arc<RwLock<Vec<RuleEntry>>>,
     next_id: Arc<RwLock<u64>>,
+}
+
+impl Default for RuleManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RuleManager {
@@ -16,7 +22,7 @@ impl RuleManager {
 
     pub fn add_rule(&self, filter: Box<dyn Filter>) -> u64 {
         let id = {
-            let mut next_id = self.next_id.write().unwrap;
+            let mut next_id = self.next_id.write().unwrap();
             let id = *next_id;
             *next_id += 1;
             id

@@ -1,9 +1,3 @@
-[package]
-name = "firewall"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-iptables = "*" 
-log = "*"        
-simplelog = "*"
+[workspace]
+members = ["firewall-core", "firewall-daemon"]
+resolver = "2"

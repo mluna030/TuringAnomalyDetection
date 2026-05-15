@@ -1,5 +1,6 @@
 use crate::domain::packet::{Packet, PacketHeader};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Action {
     Allow,
     Block,
@@ -7,7 +8,7 @@ pub enum Action {
 }
 
 pub trait Filter: Send + Sync {
-    fn quick_match(&self, header: &PacketHeader) -> bool {
+    fn quick_match(&self, _header: &PacketHeader) -> bool {
         true
     }
     fn check_packet(&self, packet: &Packet) -> Option<Action>;

@@ -14,6 +14,7 @@ pub struct TimeWindow {
     start_time: NaiveTime,
     end_time: NaiveTime,
     days: Vec<Weekday>,
+    #[allow(dead_code)]
     timezone: Option<String>,
 }
 
