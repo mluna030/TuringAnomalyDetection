@@ -1,160 +1,164 @@
-
-/*
-    Todo
-    1. Advanced Traffic Filtering
-
-    Layer 7 Filtering (Deep Packet Inspection):
-        Analyze packet content for protocols like HTTP, DNS, or MQTT.
-        Block malicious payloads (e.g., SQL injection, XSS attacks).
-
-    Geo-Blocking:
-        Use IP geolocation to block traffic from specific countries or regions.
-
-    Time-Based Rules:
-        Allow or block traffic based on time (e.g., block social media access during work hours).
-
-    Connection Rate Limiting:
-        Prevent DoS attacks by limiting connections per second from a single IP.
-
-2. Real-Time Monitoring and Alerts
-
-    Traffic Visualization:
-        Integrate with a dashboard (e.g., Grafana, Rocket, or Yew) to display:
-            Real-time connection stats.
-            Bandwidth usage per device.
-            Top blocked IPs and ports.
-
-    Alerts for Anomalous Activity:
-        Send alerts via email, Slack, or webhooks for:
-            Port scans.
-            Unusual traffic spikes.
-            Attempts to access blocked IPs or ports.
-
-    Anomaly Detection Integration:
-        Leverage the Detection Node to:
-            Flag unusual traffic patterns.
-            Auto-adjust rules (e.g., block suspicious IPs).
-
-3. Ease of Use
-
-    Web-Based Management Interface:
-        Provide a user-friendly interface for configuring rules and monitoring traffic.
-        Example technologies: Yew for Rust frontend, WebSockets for real-time updates.
-
-    API for Automation:
-        Offer a REST or gRPC API for:
-            Adding/removing rules programmatically.
-            Fetching traffic logs and stats.
-
-    Rule Templates:
-        Pre-defined rule sets for common scenarios:
-            "Basic IoT Protection."
-            "Parental Controls."
-            "Remote Worker Security."
-
-    Auto Updates:
-        Automatically fetch and apply updates for:
-            Threat intelligence feeds (e.g., known malicious IPs).
-            Firmware/software patches.
-
-4. Security Enhancements
-
-    Intrusion Detection/Prevention System (IDS/IPS):
-        Use signature or behavior-based detection to stop attacks in real time.
-
-    TLS Termination and Filtering:
-        Decrypt HTTPS traffic to inspect and enforce rules on encrypted traffic.
-
-    Port-Knocking for Access:
-        Use a sequence of connection attempts on specific ports to authenticate users before opening sensitive ports (e.g., SSH).
-
-    Device Fingerprinting:
-        Identify and enforce rules based on device type (e.g., block unauthorized IoT devices).
-
-5. Performance Optimization
-
-    Offloading:
-        Use technologies like DPDK (Data Plane Development Kit) for high-performance packet processing.
-        Offload certain tasks (e.g., anomaly detection) to dedicated nodes.
-
-    Connection Tracking:
-        Efficiently track and manage large numbers of simultaneous connections.
-
-    Traffic Prioritization (QoS):
-        Prioritize critical traffic (e.g., VoIP, video streaming) over non-critical traffic.
-
-6. Advanced Traffic Analysis
-
-    Packet Capture and Forensics:
-        Provide a mechanism for deep inspection of blocked or flagged packets (e.g., pcap file export).
-
-    Machine Learning for Threat Detection:
-        Implement lightweight ML models to classify benign vs. malicious traffic in real time.
-
-    DNS Sinkhole:
-        Redirect requests to malicious domains to a "sinkhole" to block and log them.
-
-7. Integration with Other Tools
-
-    SIEM (Security Information and Event Management):
-        Export logs in formats compatible with tools like Splunk, Graylog, or ELK Stack.
-
-    Cloud Integration:
-        Allow remote configuration and monitoring via cloud platforms.
-
-    IoT Device Management:
-        Provide a mechanism to manage connected devices (e.g., identify, monitor, and apply rules).
-
-8. Compliance and Documentation
-
-    Compliance Templates:
-        Pre-configured rules for GDPR, HIPAA, or PCI DSS compliance.
-
-    Audit Logs:
-        Provide detailed logs of configuration changes and network activity for audits.
-*/
-use std::thread;
+use clap::Parser;
+use firewall_core::domain::packet::Protocol;
+use firewall_core::rules::geo_rules::GeoBlockRule;
+use firewall_core::rules::ip_rules::IpBlocklistRule;
+use firewall_core::rules::port_rules::{PortBlocklistRule, Service, WellKnownServicesRule};
+use firewall_core::rules::rate_limit_rules::rate_limit_rules::RateLimitRule;
+use firewall_core::{
+    Action, Firewall, FirewallBuilder, MqttPublisher, MqttPublisherConfig, Packet,
+};
+use firewall_core::domain::rate_limiter::{RateLimitConfig, RateLimitKeyType};
+use std::net::{IpAddr, Ipv4Addr};
+use std::sync::Arc;
 use std::time::Duration;
+use tracing::{info, warn};
 
-mod iptables_integration;
+#[derive(Parser, Debug, Clone)]
+#[command(name = "firewall-daemon")]
+#[command(about = "Turing anomaly-detection edge firewall daemon", long_about = None)]
+struct Cli {
+    #[arg(long, default_value_t = false)]
+    no_mqtt: bool,
 
-use iptables_integration::Firewall;
-use simplelog::*;
-use std::fs::File;
+    #[arg(long, default_value = "127.0.0.1")]
+    mqtt_host: String,
 
-fn main() {
-    CombinedLogger::init(vec![
-        TermLogger::new(LevelFilter::Debug, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
-        WriteLogger::new(LevelFilter::Debug, Config::default(), File::create("firewall.log").unwrap()),
-    ])
-    .unwrap();
+    #[arg(long, default_value_t = 1883)]
+    mqtt_port: u16,
 
-    log::info!("Starting the Router Node...");
+    #[arg(long, default_value = "turing/router/flows")]
+    flow_topic: String,
 
-    match Firewall::new() {
-        Ok(firewall) => {
-            log::info!("Firewall initialized.");
+    #[arg(long, default_value = "turing/router/stats")]
+    stats_topic: String,
 
-            if let Err(e) = firewall.block_ip("192.168.1.100") {
-                log::error!("Failed to block IP: {}", e);
-            }
+    #[arg(long, default_value_t = 5)]
+    publish_interval_secs: u64,
 
-            if let Err(e) = firewall.allow_port(8080) {
-                log::error!("Failed to allow port: {}", e);
-            }
+    #[arg(long, default_value_t = 50)]
+    synthetic_packets: usize,
+}
 
-            if let Err(e) = firewall.list_rules() {
-                log::error!("Failed to list rules: {}", e);
-            }
-        }
-        Err(e) => {
-            log::error!("Failed to initialize the firewall: {}", e);
-        }
+fn install_baseline_rules(fw: &Firewall) {
+    let admin_block = PortBlocklistRule::new("block-admin-ports")
+        .add_ports([23u16, 21, 3389])
+        .with_priority(100);
+    fw.add_rule(Box::new(admin_block));
+
+    let iot_allowlist = WellKnownServicesRule::new("iot-services")
+        .allow_iot_services()
+        .with_priority(90);
+    fw.add_rule(Box::new(iot_allowlist));
+
+    let bogon = IpBlocklistRule::new("bogon-sources")
+        .add_ip(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))
+        .add_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))
+        .with_priority(95);
+    fw.add_rule(Box::new(bogon));
+
+    let geo = GeoBlockRule::new("blocked-ranges")
+        .add_range(
+            IpAddr::V4(Ipv4Addr::new(203, 0, 113, 0)),
+            IpAddr::V4(Ipv4Addr::new(203, 0, 113, 255)),
+            "TEST-NET-3",
+        )
+        .with_priority(80);
+    fw.add_rule(Box::new(geo));
+
+    let rate_limit = RateLimitRule::new(
+        "per-src-rate-limit",
+        RateLimitConfig {
+            rate: 50.0,
+            capacity: 100.0,
+            key_type: RateLimitKeyType::SourceIp,
+        },
+    )
+    .with_priority(70);
+    fw.add_rule(Box::new(rate_limit));
+}
+
+fn synthetic_packets(n: usize) -> Vec<Packet> {
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        let src = IpAddr::V4(Ipv4Addr::new(10, 0, 0, (i % 250) as u8 + 1));
+        let dst = IpAddr::V4(Ipv4Addr::new(10, 0, 1, 1));
+        let (proto, dport) = match i % 5 {
+            0 => (Protocol::Tcp, Service::Ssh.port()),
+            1 => (Protocol::Tcp, Service::Telnet.port()),
+            2 => (Protocol::Tcp, Service::Https.port()),
+            3 => (Protocol::Udp, Service::Dns.port()),
+            _ => (Protocol::Tcp, Service::Mqtt.port()),
+        };
+        out.push(
+            Packet::new(src)
+                .with_destination(dst)
+                .with_ports(40000 + (i as u16), dport)
+                .with_protocol(proto)
+                .with_payload(vec![0u8; 64]),
+        );
+    }
+    out
+}
+
+#[tokio::main(flavor = "multi_thread")]
+async fn main() {
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .with_max_level(tracing::Level::INFO)
+        .init();
+
+    let cli = Cli::parse();
+
+    info!("Starting firewall daemon (v{})", firewall_core::VERSION);
+    let fw = Arc::new(FirewallBuilder::new(Action::Block).build());
+    install_baseline_rules(&fw);
+    info!(rules = fw.list_rules().len(), "Baseline rules installed");
+
+    if !cli.no_mqtt {
+        let config = MqttPublisherConfig {
+            broker_host: cli.mqtt_host.clone(),
+            broker_port: cli.mqtt_port,
+            client_id: "firewall-router".to_string(),
+            flow_topic: cli.flow_topic.clone(),
+            stats_topic: cli.stats_topic.clone(),
+            interval: Duration::from_secs(cli.publish_interval_secs),
+            keep_alive: Duration::from_secs(15),
+        };
+        let (publisher, eventloop) = MqttPublisher::new(config);
+        let _handles = publisher.spawn(eventloop, fw.flow_tracker(), fw.stats_collector());
+        info!(
+            host = %cli.mqtt_host,
+            port = cli.mqtt_port,
+            "MQTT publisher started"
+        );
+    } else {
+        info!("MQTT disabled (--no-mqtt)");
     }
 
-    // Keep the program running
-    log::info!("Router Node is now running. Press Ctrl+C to stop.");
-    loop {
-        thread::sleep(Duration::from_secs(60));
+    let packets = synthetic_packets(cli.synthetic_packets);
+    let total = packets.len();
+    let mut allowed = 0u64;
+    let mut blocked = 0u64;
+    for pkt in &packets {
+        match fw.process_packet(pkt) {
+            Action::Allow | Action::Log => allowed += 1,
+            Action::Block => blocked += 1,
+        }
     }
+    info!(total, allowed, blocked, "TSA-precheck evaluation complete");
+
+    let stats = fw.get_stats();
+    info!(
+        total_packets = stats.total_packets,
+        allowed_packets = stats.allowed_packets,
+        blocked_packets = stats.blocked_packets,
+        active_flows = fw.active_flows(),
+        "Firewall stats"
+    );
+
+    info!("Daemon running. Send SIGINT to stop.");
+    if let Err(err) = tokio::signal::ctrl_c().await {
+        warn!(?err, "ctrl_c handler failed");
+    }
+    info!("Shutting down");
 }
